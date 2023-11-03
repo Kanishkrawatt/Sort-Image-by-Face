@@ -6,7 +6,7 @@ const { Canvas, Image, ImageData } = require("canvas");
 const { createCanvas, loadImage } = require("canvas"); // Use canvas for Node.js
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 app.use(bodyParser.json());
 app.use(
