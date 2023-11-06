@@ -27,6 +27,9 @@ Promise.all([
 ]).then(startServer);
 
 async function startServer() {
+  app.get("/", async (req, res) => {
+    res.status(200).send("HELLO");
+  });
   app.post("/analyze", async (req, res) => {
     try {
       const { imageUrls } = req.body;
@@ -38,7 +41,9 @@ async function startServer() {
         // Create a canvas and load the image into it
         const canvas = createCanvas(1, 1); // Initialize a canvas
         const img = new Image();
-        img.src = `data:image/png;base64,${Buffer.from(data).toString('base64')}`
+        img.src = `data:image/png;base64,${Buffer.from(data).toString(
+          "base64"
+        )}`;
         canvas.width = img.width;
         canvas.height = img.height;
         const ctx = canvas.getContext("2d");
