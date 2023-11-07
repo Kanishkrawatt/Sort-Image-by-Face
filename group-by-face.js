@@ -1,10 +1,9 @@
 const express = require("express");
 const axios = require("axios");
 const faceapi = require("face-api.js");
+const http = require("http");
 const bodyParser = require("body-parser");
-const { Canvas, Image, ImageData } = require("canvas");
-const { createCanvas, loadImage } = require("canvas"); // Use canvas for Node.js
-
+const { Canvas, Image, ImageData, createCanvas } = require("canvas");
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -28,9 +27,13 @@ Promise.all([
 
 async function startServer() {
   app.get("/", async (req, res) => {
-    res.status(200).send("HELLO");
+    res
+      .status(200)
+      .send(
+        "Welcome to the face recognition API! Hit the API with a POST request with an array of image URLs to get the grouped images."
+      );
   });
-  app.post("/analyze", async (req, res) => {
+  app.post("/", async (req, res) => {
     try {
       const { imageUrls } = req.body;
       const imagePromises = imageUrls.map(async (imageUrl) => {
@@ -72,17 +75,26 @@ async function startServer() {
       }
       // Group the images based on face recognition
       const groupedImages = [];
+      const processedFaces = new Set();
+
       for (const face of recognizedFaces) {
-        const group = recognizedFaces.filter((otherFace) => {
-          if (otherFace === face) return false;
-          const distance = faceapi.euclideanDistance(
-            face.descriptor,
-            otherFace.descriptor
-          );
-          return distance > 0.5; // You can adjust this threshold for matching.
-        });
-        const groupUrls = group.map((item) => item.url);
-        groupedImages.push({ urls: groupUrls });
+        if (!processedFaces.has(face)) {
+          const group = recognizedFaces.filter((otherFace) => {
+            if (otherFace === face) return false;
+            const distance = faceapi.euclideanDistance(
+              face.descriptor,
+              otherFace.descriptor
+            );
+            if (distance > 0.6) {
+              return true;
+            }
+            return false;
+          });
+
+          const groupUrls = group.map((item) => item.url);
+          groupedImages.push({ urls: groupUrls });
+          group.forEach((item) => processedFaces.add(item));
+        }
       }
 
       res.json(groupedImages);
@@ -94,7 +106,21 @@ async function startServer() {
     }
   });
 
-  app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-  });
+  const server = http.createServer(app);
+
+  function startServer(port) {
+    server.listen(port, () => {
+      console.log(`Server is running on port ${port}`);
+    });
+
+    server.on("error", (err) => {
+      if (err.code === "EADDRINUSE") {
+        startServer(port + 1);
+      }
+    });
+  }
+
+  startServer(port);
 }
+
+module.exports = app;
