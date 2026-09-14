@@ -3,9 +3,13 @@
 
 /**
  * Descriptor distance below which two faces are treated as the same person.
- * 0.55 is face-api's usual operating point; tune against real photos.
+ *
+ * 0.6 is face-api's own default, and on a real album of eight photos holding
+ * four people it recovers exactly those four. No single value is right for
+ * every album — a set of many strangers wants a tighter one — which is why the
+ * app exposes this as a slider and the API takes it per request.
  */
-export const MATCH_THRESHOLD = 0.55;
+export const MATCH_THRESHOLD = 0.6;
 
 export function euclidean(a, b) {
   let sum = 0;

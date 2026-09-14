@@ -13,6 +13,7 @@
       <p class="lede">
         Pick a folder of photos and they are grouped by who appears in them.
         Everything runs in this browser — no photo is uploaded anywhere.
+        If a person comes out split in two, tick both and merge them.
       </p>
 
       <div class="toolbar">
@@ -23,6 +24,15 @@
       <input id="picker" type="file" webkitdirectory multiple accept="image/*" hidden />
 
       <div id="progress" hidden><div id="bar"></div></div>
+
+      <div class="tuning" id="tuning" hidden>
+        <label for="threshold">Grouping</label>
+        <input id="threshold" type="range" min="0.35" max="0.75" step="0.01" value="0.6" />
+        <span id="thresholdValue" class="mono">0.60</span>
+        <span class="hint">left splits people apart, right merges them together</span>
+        <button id="merge" type="button" disabled>Merge selected</button>
+        <button id="reset" type="button" class="ghost" disabled>Undo merges</button>
+      </div>
       <p id="summary"></p>
       <div id="results"></div>
     </main>

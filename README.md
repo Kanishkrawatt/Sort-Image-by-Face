@@ -113,7 +113,8 @@ curl -X POST https://your-service.onrender.com/api/group \
 | `POST /` | The older `[{urls:[...]}]` shape, kept for existing callers. |
 
 Optional `threshold` in the body overrides the clustering distance for that
-request, which is the quickest way to tune grouping without redeploying.
+request (default 0.6). Lower splits people apart, higher merges them together;
+it is the quickest way to tune grouping without redeploying.
 
 A photo that fails to download appears in `failed`; the rest of the batch still
 returns. A photo with no faces appears in `noFaces`.
@@ -168,9 +169,26 @@ timeout, and an `image/*` content type. `ALLOWED_IMAGE_HOSTS` narrows it further
 ## Notes on the design
 
 **Clustering.** Each face joins the nearest cluster whose centroid is within
-0.55, or starts its own. A photo with three people therefore appears under three
-names. Greedy assignment is order-dependent and occasionally splits one person
-in two; merging two people by hand is a smaller fix than a heavier algorithm.
+0.6, or starts its own. A photo with three people therefore appears under three
+names.
+
+No single threshold is right for every album, and this is not a tuning problem
+that can be solved once. On a set of eight photos holding four people, the
+descriptors for faces that are sideways, dark or blurry are simply not
+separable: every threshold from 0.5 to 0.55 gave six people, 0.6 gave four,
+0.62 gave three. Average-linkage agglomerative clustering produced identical
+counts, so the algorithm is not the limit — the descriptors are. Raising the
+working resolution from 1280 to 2048 did not improve separation either.
+
+So the app exposes the threshold as a slider and lets you merge two groups by
+hand, and the API takes `threshold` per request. Those two controls are more
+reliable than any default.
+
+**Quality gates.** Faces below 0.55 detector confidence or 30px are dropped. At
+0.5 the detector reported a patterned jacket as a face, which then appeared as a
+person of its own; tiny faces are worse than useless, because their descriptors
+sit close to everything and pull unrelated people together. Both gates are kept
+deliberately low so real faces survive.
 
 **Detector.** `ssdMobilenetv1`. An earlier version shipped `tinyFaceDetector`
 instead, which is a tenth of the size and three times faster — and on real phone

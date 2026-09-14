@@ -142,3 +142,28 @@ button:disabled { opacity: 0.55; cursor: default; }
 .login button { width: 100%; }
 
 .error { color: #c0392b; min-height: 1.4em; margin: 10px 0 0; font-size: 0.9rem; }
+
+/* Tuning bar */
+.tuning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.tuning label { font-weight: 600; }
+
+.tuning input[type="range"] { flex: 1 1 180px; max-width: 280px; accent-color: var(--accent); }
+
+.mono { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 4ch; }
+
+.hint { color: var(--muted); font-size: 0.85rem; flex: 1 1 auto; }
+
+button.ghost { background: transparent; color: var(--ink); }
+
+.tick { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }

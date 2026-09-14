@@ -9,6 +9,10 @@ const MODEL_URL = "/models";
  * Longest side a photo is scaled to before detection. Detection cost scales
  * with pixel count, and the recognition net only ever sees a small aligned
  * crop, so a 12MP original buys nothing but memory pressure.
+ *
+ * 2048 was tried and made descriptors no more separable — it only let smaller
+ * faces clear the size floor below — while crashing the tab with three photos
+ * in flight at once.
  */
 const MAX_DIM = 1280;
 
@@ -23,10 +27,20 @@ const THUMB_PX = 96;
 const PREVIEW_PX = 320;
 
 /**
- * Minimum detector confidence. 0.5 keeps blurred bystanders out while still
- * finding faces that are small or turned away.
+ * Minimum detector confidence. At 0.5 the detector reported patterned fabric
+ * as a face, which then showed up as a person of its own; that scored 0.50.
+ * Raising it further starts costing real faces in dark photos, so this sits
+ * just above the false positive rather than comfortably above it.
  */
-const MIN_CONFIDENCE = 0.5;
+const MIN_CONFIDENCE = 0.55;
+
+/**
+ * Faces smaller than this on the processed image are dropped. A face of twenty
+ * pixels produces a descriptor close to every other descriptor, so it does not
+ * simply form its own group — it pulls unrelated people together. Kept low, so
+ * that real faces survive; the merge control handles what is left.
+ */
+const MIN_FACE_PX = 30;
 
 let ready = null;
 let backend = "unknown";
@@ -62,7 +76,7 @@ export function init(onProgress = () => {}) {
     onProgress("Loading models");
     await Promise.all([
       faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
-      faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
+      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
       faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
     ]);
 
@@ -159,16 +173,25 @@ export async function detectFaces(file) {
   try {
     const results = await faceapi
       .detectAllFaces(image, detectorOptions)
-      .withFaceLandmarks(true) // true selects the tiny landmark net
+      // Full 68-point landmarks, not the tiny net: descriptors are extracted
+      // from a crop aligned by these points, and many real photos have faces
+      // at an angle where the alignment matters.
+      .withFaceLandmarks()
       .withFaceDescriptors();
 
     return {
       preview: previewOf(image),
-      faces: results.map((result) => ({
-        descriptor: Array.from(result.descriptor),
-        thumbnail: cropFace(image, result.detection.box),
-        score: result.detection.score,
-      })),
+      faces: results
+        .filter(
+          (result) =>
+            Math.min(result.detection.box.width, result.detection.box.height) >=
+            MIN_FACE_PX,
+        )
+        .map((result) => ({
+          descriptor: Array.from(result.descriptor),
+          thumbnail: cropFace(image, result.detection.box),
+          score: result.detection.score,
+        })),
     };
   } finally {
     // Let the backing store go now rather than at the next collection.

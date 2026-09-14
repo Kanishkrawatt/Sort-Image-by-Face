@@ -264,6 +264,46 @@ written for the browser login.
 Clustering is shared: the API imports the same `public/cluster.js` the browser
 uses, so both paths group identically and there is one implementation to test.
 
+## Addendum: what tuning could and could not fix
+
+A real album of eight photos containing four people was grouped into six. The
+investigation that followed is worth recording, because it ends in a ceiling
+rather than a fix.
+
+**What was wrong and got fixed.** The detector reported a patterned jacket as a
+face at confidence 0.50, which became a person of its own. Faces as small as
+24px were being kept, and their descriptors sit close to every other descriptor,
+so they do not merely form their own group — they pull unrelated people
+together. Confidence below 0.55 and faces below 30px are now dropped, and the
+full 68-point landmark net replaces the tiny one, since descriptors are taken
+from a crop aligned by those points and many real photos have faces at an angle.
+
+**What did not help.** Raising the working resolution to 2048 left descriptor
+separation unchanged (nearest-neighbour distance 0.418 against 0.403 at 1280)
+and crashed the tab with three photos in flight. Average-linkage agglomerative
+clustering returned counts identical to the greedy pass at every threshold, so
+the clustering algorithm is not the limiting factor. Full landmarks moved the
+minimum pair distance from 0.420 to 0.407 — real, but small.
+
+**The ceiling.** Across that album the pairwise descriptor distances ran from
+0.40 to 0.93 with a median of 0.65, and same-person pairs were not separated
+from different-person pairs by any margin. Photos with sideways, dark or blurry
+faces are simply outside what this recognition model resolves. Every parameter
+set that reported exactly four people did so by discarding most of the album:
+confidence 0.75 with a 50px floor reached four, from five faces across three of
+the eight photos.
+
+**What was done instead.** The threshold became a slider over cached
+descriptors, so moving it regroups instantly without re-reading a photo, and two
+groups can be merged by hand. After the gates and the landmark change the curve
+is at least monotonic and legible — 0.50 and 0.55 give six people, 0.58 five,
+0.60 four, 0.62 three — where before it jumped from seven to two. The default is
+0.6, which is face-api's own default and recovers exactly the four people in
+that album.
+
+Names are stored against a face's stable identity rather than a group number, so
+renaming survives both re-grouping and merging.
+
 ## Explicitly out of scope
 
 A Rust implementation. The pipeline is CNN inference, which is already compiled
