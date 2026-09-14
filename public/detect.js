@@ -12,11 +12,21 @@ const MODEL_URL = "/models";
  */
 const MAX_DIM = 1280;
 
-/** Size of the square face crop kept for the results grid. */
+/** Size of the square face crop shown next to each person. */
 const THUMB_PX = 96;
 
-/** Faces scoring below this are usually blurred bystanders. */
-const SCORE_THRESHOLD = 0.5;
+/**
+ * Longest side of the per-photo preview shown in the results grid. The grid
+ * draws tiles about 110px wide, and decoding a 12MP original for each one is
+ * what makes a large album crawl.
+ */
+const PREVIEW_PX = 320;
+
+/**
+ * Minimum detector confidence. 0.5 keeps blurred bystanders out while still
+ * finding faces that are small or turned away.
+ */
+const MIN_CONFIDENCE = 0.5;
 
 let ready = null;
 let backend = "unknown";
@@ -51,7 +61,7 @@ export function init(onProgress = () => {}) {
 
     onProgress("Loading models");
     await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+      faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
       faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
       faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
     ]);
@@ -123,14 +133,26 @@ function cropFace(source, box) {
   return canvas.toDataURL("image/jpeg", 0.8);
 }
 
-const detectorOptions = new faceapi.TinyFaceDetectorOptions({
-  inputSize: 416,
-  scoreThreshold: SCORE_THRESHOLD,
+// ssdMobilenetv1, not tinyFaceDetector. Tiny is a third of the speed and a
+// tenth of the size, but on ordinary phone photos it missed almost everything:
+// on one real folder it found 1 face where this finds 12. Accuracy wins.
+/** A small JPEG of the whole photo, for the results grid. */
+function previewOf(source) {
+  const scale = PREVIEW_PX / Math.max(source.width, source.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(source.width * Math.min(1, scale)));
+  canvas.height = Math.max(1, Math.round(source.height * Math.min(1, scale)));
+  canvas.getContext("2d").drawImage(source, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.7);
+}
+
+const detectorOptions = new faceapi.SsdMobilenetv1Options({
+  minConfidence: MIN_CONFIDENCE,
 });
 
 /**
- * Every face found in one photo.
- * @returns {Promise<Array<{descriptor: number[], thumbnail: string, score: number}>>}
+ * Every face found in one photo, plus a small preview of the photo itself.
+ * @returns {Promise<{faces: Array<{descriptor: number[], thumbnail: string, score: number}>, preview: string}>}
  */
 export async function detectFaces(file) {
   const image = await loadCanvas(file);
@@ -140,11 +162,14 @@ export async function detectFaces(file) {
       .withFaceLandmarks(true) // true selects the tiny landmark net
       .withFaceDescriptors();
 
-    return results.map((result) => ({
-      descriptor: Array.from(result.descriptor),
-      thumbnail: cropFace(image, result.detection.box),
-      score: result.detection.score,
-    }));
+    return {
+      preview: previewOf(image),
+      faces: results.map((result) => ({
+        descriptor: Array.from(result.descriptor),
+        thumbnail: cropFace(image, result.detection.box),
+        score: result.detection.score,
+      })),
+    };
   } finally {
     // Let the backing store go now rather than at the next collection.
     image.width = 0;

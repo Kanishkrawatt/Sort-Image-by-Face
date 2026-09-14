@@ -6,6 +6,7 @@ const CONCURRENCY = 3;
 
 const state = {
   files: new Map(), // path -> File
+  previews: new Map(), // path -> small JPEG data URL
   faces: [],
   noFaces: [],
   skipped: [],
@@ -57,6 +58,7 @@ async function run(fileList) {
 
   Object.assign(state, {
     files: new Map(),
+    previews: new Map(),
     faces: [],
     noFaces: [],
     skipped: [],
@@ -76,11 +78,12 @@ async function run(fileList) {
       state.files.set(path, file);
 
       try {
-        const found = await detectFaces(file);
-        if (found.length === 0) {
+        const { faces, preview } = await detectFaces(file);
+        state.previews.set(path, preview);
+        if (faces.length === 0) {
           state.noFaces.push(path);
         } else {
-          for (const face of found) {
+          for (const face of faces) {
             state.faces.push({ ...face, fileName: path });
           }
         }
@@ -121,7 +124,9 @@ function photoTile(path) {
   img.loading = "lazy";
   img.alt = basename(path);
   img.title = path;
-  img.src = URL.createObjectURL(state.files.get(path));
+  // The small preview made during detection, not the original: decoding a
+  // 12MP file for a 110px tile is what makes a large album crawl.
+  img.src = state.previews.get(path);
   return img;
 }
 

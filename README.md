@@ -19,7 +19,7 @@ BROWSER                                   SERVER (Render free tier)
 
 Keeping inference in the browser is what makes the free tier viable: the server
 holds no models, so it needs roughly 50MB of RAM and starts cold in seconds
-rather than loading 6.4MB of weights on every wake.
+rather than loading 12MB of weights on every wake.
 
 | File | What it does |
 |---|---|
@@ -171,6 +171,11 @@ timeout, and an `image/*` content type. `ALLOWED_IMAGE_HOSTS` narrows it further
 0.55, or starts its own. A photo with three people therefore appears under three
 names. Greedy assignment is order-dependent and occasionally splits one person
 in two; merging two people by hand is a smaller fix than a heavier algorithm.
+
+**Detector.** `ssdMobilenetv1`. An earlier version shipped `tinyFaceDetector`
+instead, which is a tenth of the size and three times faster — and on real phone
+photos it found 1 face in a folder where this one finds 12. The demo photos have
+large frontal faces and hid the difference completely. Accuracy wins.
 
 **Backends.** WebGL, falling back to WASM and then CPU. WebGPU is not bundled
 with the face-api build in use and would require adding a bundler, which is not

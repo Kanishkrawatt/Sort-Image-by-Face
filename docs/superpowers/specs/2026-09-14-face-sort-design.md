@@ -53,16 +53,24 @@ also removes a native build from the Render deploy.
 
 ### Models
 
-Reduced from 13MB to 6.7MB by deleting what is never used:
+Reduced from 13MB to 12MB by deleting what is never used:
 
 | Model | Size | Kept |
 |---|---|---|
-| `tiny_face_detector` | 193KB | yes |
+| `ssd_mobilenetv1` | 5.6MB | yes — the detector |
 | `face_landmark_68_tiny` | 77KB | yes |
-| `face_recognition` | 6.4MB | yes — this is the descriptor net |
-| `ssd_mobilenetv1` | 5.6MB | no |
+| `face_recognition` | 6.4MB | yes — the descriptor net |
+| `tiny_face_detector` | 193KB | no — see below |
 | `age_gender` | 430KB | no |
 | `face_expression` | 330KB | no |
+
+An earlier version of this design kept `tiny_face_detector` and dropped
+`ssd_mobilenetv1`, cutting the download to 6.7MB. That was wrong. On a real
+folder of phone photos the tiny detector found **1 face where SSD finds 12**;
+every test until then used the library's demo photos, which have large frontal
+faces and hide the difference entirely. A face sorter that misses eleven faces
+in twelve is not worth 5.6MB of saved download, so SSD is the detector and the
+size saving is given back.
 
 ### Library
 
