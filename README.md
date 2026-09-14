@@ -109,7 +109,8 @@ curl -X POST https://your-service.onrender.com/api/group \
 | `POST /api/group` | Blocking. Up to 40 images. |
 | `POST /api/jobs` | Returns `202 {jobId}`. Up to 250 images. |
 | `GET /api/jobs/:id` | Job status, then the same body as `/api/group`. |
-| `GET /api/status` | Limits, queue depth, configured threshold. |
+| `POST /api/compare` | Are these two photos the same person? See the warning below. |
+| `GET /api/status` | Limits, queue depth, configured threshold, route list. |
 | `POST /` | The older `[{urls:[...]}]` shape, kept for existing callers. |
 
 Optional `threshold` in the body overrides the clustering distance for that
@@ -118,6 +119,38 @@ it is the quickest way to tune grouping without redeploying.
 
 A photo that fails to download appears in `failed`; the rest of the batch still
 returns. A photo with no faces appears in `noFaces`.
+
+### Comparing two photos
+
+```sh
+curl -X POST .../api/compare -H 'x-api-key: KEY' -H 'content-type: application/json' \
+  -d '{"a": "https://.../reference.jpg", "b": "https://.../capture.jpg"}'
+```
+
+```json
+{
+  "match": false, "distance": 0.8601, "threshold": 0.65,
+  "a": {"faces": 3, "score": 0.989, "box": {"x": 1206, "y": 128, "width": 161, "height": 203}},
+  "b": {"faces": 5, "score": 0.9923, "box": {"x": 656, "y": 91, "width": 130, "height": 177}}
+}
+```
+
+The clearest face in each photo is compared. `faces` tells you how many were
+found: anything above one means the answer is ambiguous and you should send a
+cropped, single-face image instead. A photo with no face returns 422 rather
+than a verdict, so "no face" is never silently reported as "no match".
+
+Use `distance`, not `match`. The boolean is only `distance < threshold`, and
+the right threshold depends on your photos.
+
+**This is a similarity measurement, not an identity check, and it must not gate
+access to anything.** It compares two images and cannot tell a person from a
+photograph of that person, so anyone holding a picture of the subject passes.
+The descriptors are also unreliable on faces that are turned away, dark or
+blurry — on one real album, distances between *different* people ran as low as
+0.40 while distances between the *same* person reached 0.93. Treat a match as a
+hint for sorting and labelling. Anything that must actually be enforced needs
+real authentication and authorisation on the server holding the data.
 
 ### Speed, and why there are two endpoints
 
