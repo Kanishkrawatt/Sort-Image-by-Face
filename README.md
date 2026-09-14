@@ -72,6 +72,22 @@ across the six samples.
 `render.yaml` describes a free web service. Set `APP_SECRET` in the dashboard;
 `COOKIE_KEY` is generated for you.
 
+**A service created before that file exists does not use it.** It keeps whatever
+build and start commands were typed into its dashboard, and a first deploy of
+this code onto such a service fails in a way that does not look like a
+misconfiguration. Check all four of these on the service itself:
+
+| Setting | Must be | Why |
+|---|---|---|
+| Build command | `npm ci --omit=dev` | `yarn` ignores `package-lock.json` and resolves fresh, so the versions that run are not the versions that were tested. |
+| Start command | `npm start` | `yarn dev` runs `node --watch`, which keeps the process alive after a fatal startup error instead of exiting. Render then reports "no open ports detected" rather than the actual error. |
+| Environment | `APP_SECRET`, `API_KEY`, `ALLOWED_IMAGE_HOSTS` | The server exits deliberately if `APP_SECRET` or `COOKIE_KEY` is missing. |
+| Node version | from `.node-version` | `engines` alone says `>=20`, which Render reads as "newest available". That has already meant Node 26, whose ABI may have no prebuilt `sharp` binary. |
+
+The `node --watch` point is the one that wastes time. The process prints its
+error, declines to exit, binds nothing, and the deploy times out on a port scan
+several minutes later with the real cause scrolled far above.
+
 There is deliberately no keep-alive ping. The free tier grants 750 instance
 hours a month and a month is 720–744 hours, so pinging to stay awake spends
 essentially the whole budget to avoid a cold start of a few seconds.
