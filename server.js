@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
@@ -16,16 +17,30 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const port = process.env.PORT || 3000;
 
 const APP_SECRET = process.env.APP_SECRET;
-const COOKIE_KEY = process.env.COOKIE_KEY;
 
-if (!APP_SECRET || !COOKIE_KEY) {
+if (!APP_SECRET) {
   console.error(
-    "Missing configuration. Set both before starting:\n" +
-      "  APP_SECRET  the passphrase that unlocks the app\n" +
-      "  COOKIE_KEY  a random string used to sign session cookies\n\n" +
-      "Generate a key with:  node -e \"console.log(crypto.randomUUID())\"",
+    "Missing configuration: APP_SECRET is not set.\n\n" +
+      "It is the passphrase that unlocks the app, and there is no safe default\n" +
+      "for it, so the server will not start without one. Set it on the service\n" +
+      "and deploy again.\n\n" +
+      "Optional alongside it:\n" +
+      "  COOKIE_KEY           signs session cookies; generated per boot if unset\n" +
+      "  API_KEY              enables the machine-facing API; it stays off without one\n" +
+      "  ALLOWED_IMAGE_HOSTS  hosts the API may fetch images from",
   );
   process.exit(1);
+}
+
+// A signing key has a safe default: a fresh random one. The only cost is that
+// existing sessions stop being valid, and on a free instance that sleeps, that
+// happens routinely anyway. Requiring it by hand bought nothing.
+const COOKIE_KEY = process.env.COOKIE_KEY || crypto.randomUUID();
+if (!process.env.COOKIE_KEY) {
+  console.warn(
+    "COOKIE_KEY is not set, so one was generated. Sessions will end whenever " +
+      "this process restarts. Set it to keep people signed in across deploys.",
+  );
 }
 
 const app = express();
