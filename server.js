@@ -33,8 +33,16 @@ app.set("trust proxy", 1); // Render terminates TLS in front of us.
 
 app.get("/healthz", (_req, res) => res.type("text").send("ok"));
 
+const publicDir = path.join(root, "public");
+
 app.get("/login", (_req, res) => {
-  res.sendFile(path.join(root, "public", "login.html"));
+  res.sendFile(path.join(publicDir, "login.html"));
+});
+
+// The login page's own assets, served before the gate so it is not unstyled.
+// Only these exact paths match, so there is nothing to traverse.
+app.get(["/style.css", "/favicon.svg"], (req, res) => {
+  res.sendFile(path.join(publicDir, req.path));
 });
 
 app.post("/api/auth", express.json({ limit: "1kb" }), (req, res) => {
@@ -64,7 +72,7 @@ app.use((req, res, next) => {
   res.status(401).json({ error: "Not authenticated." });
 });
 
-app.use(express.static(path.join(root, "public")));
+app.use(express.static(publicDir));
 
 // Models are content-addressed by their filename and never change in place.
 app.use(

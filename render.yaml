@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: sort-image-by-face
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Set this yourself in the Render dashboard: it is the passphrase.
+      - key: APP_SECRET
+        sync: false
+      # Render generates this once; changing it signs everyone out.
+      - key: COOKIE_KEY
+        generateValue: true

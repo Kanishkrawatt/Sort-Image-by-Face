@@ -37,7 +37,6 @@ BROWSER  (all compute)
   app.js        folder selection, orchestration, rendering
   detect.js     face-api wrapper: File -> [descriptor]
   cluster.js    greedy clustering of descriptors
-  worker.js     runs detect.js off the main thread
   vendor/       face-api dist, jszip
   models/       6.7MB, cached by the browser after first load
 
@@ -71,7 +70,7 @@ Reduced from 13MB to 6.7MB by deleting what is never used:
 compatible API and current TensorFlow.js. The original's last release was 2020
 and pins tfjs 1.x.
 
-Backend preference at runtime: WebGPU, then WebGL, then WASM. This choice is
+Backend preference at runtime: WebGL, then WASM, then CPU. This choice is
 worth roughly 10x end to end and is the only performance lever that matters —
 the pipeline is CNN inference, which already runs as compiled code regardless of
 the language orchestrating it.
@@ -132,10 +131,10 @@ models are genuinely not served without a valid cookie.
 No bundler. The app is plain ES modules; face-api and jszip are vendored as dist
 files. Render runs `npm install && node server.js` with nothing to build.
 
-The one thing that could change this: if the WebGPU backend turns out to need a
-TensorFlow.js backend package that the face-api dist does not bundle, adding
-Vite may be cheaper than vendoring it by hand. This is checked during phase 1
-rather than assumed.
+This was checked rather than assumed: the `@vladmandic/face-api` bundle ships
+TensorFlow.js 4.22.0 with the CPU, WebGL and WASM backends, and no WebGPU. Using
+WebGPU would mean adding a bundler and the no-bundle build, so it is deferred
+until a real album shows WebGL is too slow.
 
 Environment variables: `APP_SECRET`, `COOKIE_KEY`.
 
@@ -165,14 +164,40 @@ A run never aborts partway. Specifically:
   the shipped bug lived, so this is where the check goes.
 - `auth.test.js` — a tampered cookie is rejected; an expired cookie is rejected.
 
+## Implementation notes
+
+Three things only surfaced once the code ran in a real browser.
+
+**face-api rejects an `ImageBitmap`.** Its `toNetInput` accepts an image, video,
+canvas or tensor. Worse, in the chained
+`.withFaceLandmarks().withFaceDescriptors()` form the rejection is swallowed and
+the promise never settles, so passing a bitmap hangs forever instead of
+throwing — the user would have seen a frozen progress bar. Photos are therefore
+decoded to an `ImageBitmap` for cheap downscaling and then drawn into a canvas,
+which is what detection receives.
+
+**The first inference costs seconds, not milliseconds.** Compiling the WebGL
+shaders took roughly six seconds on first use. `init` now runs one throwaway
+detection so that cost is paid while the loading message is on screen; after
+that, a photo takes 40–130ms.
+
+**The login page needs its stylesheet before the gate.** `style.css` and
+`favicon.svg` are served ahead of the session check; everything else, including
+the models and the app code, stays behind it.
+
+No Web Worker was built. Detection awaits between photos, which yields to the
+event loop often enough for the progress bar to paint, and face-api's browser
+environment detection assumes a DOM. Revisit only if the UI actually janks.
+
 ## Phases
 
 1. Server gate, static serving, detection, clustering, and a plain result grid.
    Working end to end.
 2. Person naming, per-person zip download, no-faces bucket, skipped counter.
 3. Deferred: remembered people in IndexedDB, a merge-two-people control, an
-   opt-in `ssd_mobilenetv1` accuracy toggle, and splitting static assets onto a
-   Render static site to avoid the cold start.
+   opt-in `ssd_mobilenetv1` accuracy toggle, a Web Worker if the UI janks, the
+   WebGPU backend, and splitting static assets onto a Render static site to
+   avoid the cold start.
 
 ## Explicitly out of scope
 

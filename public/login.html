@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sort by Face</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <form class="login" id="form">
+      <h1>Sort by Face</h1>
+      <p class="lede">Enter the passphrase to continue.</p>
+      <input
+        id="passphrase"
+        type="password"
+        autocomplete="current-password"
+        placeholder="Passphrase"
+        aria-label="Passphrase"
+        required
+      />
+      <button type="submit">Unlock</button>
+      <p class="error" id="error" role="alert"></p>
+    </form>
+
+    <script>
+      const form = document.querySelector("#form");
+      const error = document.querySelector("#error");
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        error.textContent = "";
+
+        const response = await fetch("/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            passphrase: document.querySelector("#passphrase").value,
+          }),
+        });
+
+        if (response.ok) {
+          location.href = "/";
+          return;
+        }
+
+        const body = await response.json().catch(() => ({}));
+        error.textContent = body.error || "Could not sign in.";
+      });
+    </script>
+  </body>
+</html>
