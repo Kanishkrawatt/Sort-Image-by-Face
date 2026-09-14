@@ -82,6 +82,52 @@ test("regression: the old comparison grouped different people together", () => {
   assert.equal(clusters.length, 2);
 });
 
+test("two faces in one photo are never the same person", () => {
+  // Even with byte-identical descriptors, one frame cannot hold one person
+  // twice — so these must stay apart.
+  const same = descriptor(0, 1);
+  const clusters = clusterFaces([
+    { fileName: "group.jpg", descriptor: same },
+    { fileName: "group.jpg", descriptor: same },
+    { fileName: "group.jpg", descriptor: same },
+  ]);
+
+  assert.equal(clusters.length, 3, "three faces in one photo are three people");
+  for (const cluster of clusters) assert.equal(cluster.faces.length, 1);
+});
+
+test("a group shot puts its photo under every person in it", () => {
+  const alice = descriptor(0, 5);
+  const bob = descriptor(1, 5);
+  const carol = descriptor(2, 5);
+
+  const clusters = clusterFaces([
+    { fileName: "group.jpg", descriptor: alice },
+    { fileName: "group.jpg", descriptor: bob },
+    { fileName: "group.jpg", descriptor: carol },
+    { fileName: "alice-solo.jpg", descriptor: jitter(alice, 0.05) },
+  ]);
+
+  assert.equal(clusters.length, 3);
+  const appearances = clusters.filter((c) => photosIn(c).includes("group.jpg"));
+  assert.equal(appearances.length, 3, "the group photo appears under all three");
+  assert.deepEqual(photosIn(clusters[0]), ["group.jpg", "alice-solo.jpg"]);
+});
+
+test("the same-photo rule still lets a later photo join the right person", () => {
+  const alice = descriptor(0, 5);
+  const bob = descriptor(1, 5);
+  const clusters = clusterFaces([
+    { fileName: "group.jpg", descriptor: alice },
+    { fileName: "group.jpg", descriptor: bob },
+    { fileName: "later.jpg", descriptor: jitter(bob, 0.05) },
+  ]);
+
+  assert.equal(clusters.length, 2);
+  const bobGroup = clusters.find((c) => photosIn(c).includes("later.jpg"));
+  assert.deepEqual(photosIn(bobGroup), ["group.jpg", "later.jpg"]);
+});
+
 test("clusters come back ordered largest first", () => {
   const faces = [
     { fileName: "solo.jpg", descriptor: descriptor(1, 9) },

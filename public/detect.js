@@ -32,7 +32,7 @@ const PREVIEW_PX = 320;
  * Raising it further starts costing real faces in dark photos, so this sits
  * just above the false positive rather than comfortably above it.
  */
-const MIN_CONFIDENCE = 0.55;
+const MIN_CONFIDENCE = 0.5;
 
 /**
  * Faces smaller than this on the processed image are dropped. A face of twenty
@@ -40,7 +40,7 @@ const MIN_CONFIDENCE = 0.55;
  * simply form its own group — it pulls unrelated people together. Kept low, so
  * that real faces survive; the merge control handles what is left.
  */
-const MIN_FACE_PX = 30;
+const MIN_FACE_PX = 24;
 
 let ready = null;
 let backend = "unknown";

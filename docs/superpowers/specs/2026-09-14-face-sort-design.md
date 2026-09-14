@@ -293,7 +293,27 @@ set that reported exactly four people did so by discarding most of the album:
 confidence 0.75 with a 50px floor reached four, from five faces across three of
 the eight photos.
 
-**What was done instead.** The threshold became a slider over cached
+**What actually fixed it.** Two faces in the same photo are two different
+people. Nobody appears twice in one frame, so a cluster never accepts a second
+face from a photo it already holds. This is knowledge the descriptors do not
+carry, and it changes the character of the result: without it, raising the
+threshold collapsed everyone in a group shot into one person, so the count fell
+off a cliff and only a knife-edge value looked correct. With it, the same album
+returns four people for every threshold from 0.64 to 0.72 — a plateau that wide
+is evidence the answer is right rather than lucky — and a photo of three people
+appears under all three names.
+
+The quality gates were also loosened back to 0.5 confidence and 24px, having
+been set too tight: at 0.55 and 30px they discarded real faces in dark photos,
+leaving four faces where twelve were available. An occasional false positive is
+easier to live with than a missing person, and the merge control exists for the
+former.
+
+The default threshold is 0.65, in the middle of that plateau. It is not
+universal: an album full of strangers over-merges there and wants nearer 0.55.
+Personal albums of a few friends are the case this serves.
+
+**What was done alongside.** The threshold became a slider over cached
 descriptors, so moving it regroups instantly without re-reading a photo, and two
 groups can be merged by hand. After the gates and the landmark change the curve
 is at least monotonic and legible — 0.50 and 0.55 give six people, 0.58 five,

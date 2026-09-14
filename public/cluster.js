@@ -4,12 +4,17 @@
 /**
  * Descriptor distance below which two faces are treated as the same person.
  *
- * 0.6 is face-api's own default, and on a real album of eight photos holding
- * four people it recovers exactly those four. No single value is right for
- * every album — a set of many strangers wants a tighter one — which is why the
- * app exposes this as a slider and the API takes it per request.
+ * 0.65 sits in the middle of a wide plateau: on a real album of eight photos
+ * holding four people, every value from 0.64 to 0.72 recovers exactly those
+ * four. A plateau that broad is a sign the answer is right rather than lucky.
+ *
+ * No single value suits every album. The same setting applied to a set of
+ * photos full of strangers over-merges them — that set wants something nearer
+ * 0.55. Personal albums of a few friends are what this is for, so the default
+ * serves them, and the app exposes a slider while the API takes `threshold`
+ * per request.
  */
-export const MATCH_THRESHOLD = 0.6;
+export const MATCH_THRESHOLD = 0.65;
 
 export function euclidean(a, b) {
   let sum = 0;
@@ -24,7 +29,8 @@ export function euclidean(a, b) {
  * Group faces by identity, greedily.
  *
  * Each face joins the cluster whose centroid it is nearest to, provided that
- * distance is under the threshold; otherwise it starts a cluster of its own.
+ * distance is under the threshold and that cluster holds no other face from
+ * the same photo; otherwise it starts a cluster of its own.
  *
  * A face carries the photo it came from, so a photo holding three people ends
  * up in three clusters. Returned clusters are sorted largest first.
@@ -40,6 +46,12 @@ export function clusterFaces(faces, threshold = MATCH_THRESHOLD) {
     let nearestDistance = Infinity;
 
     for (const cluster of clusters) {
+      // Two faces in the same photo are two different people. Nobody appears
+      // twice in one frame, so this is free knowledge the descriptors do not
+      // have, and it is what keeps everyone in a group shot from collapsing
+      // into a single person.
+      if (cluster.photos.has(face.fileName)) continue;
+
       const distance = euclidean(face.descriptor, cluster.centroid);
       if (distance < nearestDistance) {
         nearestDistance = distance;
@@ -49,6 +61,7 @@ export function clusterFaces(faces, threshold = MATCH_THRESHOLD) {
 
     if (nearest && nearestDistance < threshold) {
       nearest.faces.push(face);
+      nearest.photos.add(face.fileName);
       // Fold the new descriptor into the running mean.
       const n = nearest.faces.length;
       for (let i = 0; i < nearest.centroid.length; i++) {
@@ -59,6 +72,7 @@ export function clusterFaces(faces, threshold = MATCH_THRESHOLD) {
         id: clusters.length,
         centroid: Array.from(face.descriptor),
         faces: [face],
+        photos: new Set([face.fileName]),
       });
     }
   }

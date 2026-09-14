@@ -113,7 +113,7 @@ curl -X POST https://your-service.onrender.com/api/group \
 | `POST /` | The older `[{urls:[...]}]` shape, kept for existing callers. |
 
 Optional `threshold` in the body overrides the clustering distance for that
-request (default 0.6). Lower splits people apart, higher merges them together;
+request (default 0.65). Lower splits people apart, higher merges them together;
 it is the quickest way to tune grouping without redeploying.
 
 A photo that fails to download appears in `failed`; the rest of the batch still
@@ -169,26 +169,35 @@ timeout, and an `image/*` content type. `ALLOWED_IMAGE_HOSTS` narrows it further
 ## Notes on the design
 
 **Clustering.** Each face joins the nearest cluster whose centroid is within
-0.6, or starts its own. A photo with three people therefore appears under three
-names.
+0.65 — provided that cluster holds no other face from the same photo.
 
-No single threshold is right for every album, and this is not a tuning problem
-that can be solved once. On a set of eight photos holding four people, the
-descriptors for faces that are sideways, dark or blurry are simply not
-separable: every threshold from 0.5 to 0.55 gave six people, 0.6 gave four,
-0.62 gave three. Average-linkage agglomerative clustering produced identical
-counts, so the algorithm is not the limit — the descriptors are. Raising the
-working resolution from 1280 to 2048 did not improve separation either.
+That last rule matters more than any tuning. Nobody appears twice in one frame,
+so two faces in a photo are two people. It is knowledge the descriptors do not
+have, and without it everyone in a group shot tends to collapse into a single
+person as the threshold rises. With it, a photo of three people appears under
+all three names, and the result stops being sensitive to the exact threshold:
+on a real album of four people, every value from 0.64 to 0.72 recovers exactly
+four, where before only a knife-edge did.
+
+No single threshold is right for every album. The default suits a personal
+album of a few friends; a set full of strangers over-merges at 0.65 and wants
+something nearer 0.55.
+
+Descriptor quality is still the ceiling. Faces that are sideways, dark or
+blurry produce descriptors that are not cleanly separable, and no threshold
+fixes that. Average-linkage agglomerative clustering produced counts identical
+to this greedy pass, so the algorithm is not the limit, and raising the working
+resolution from 1280 to 2048 did not improve separation either.
 
 So the app exposes the threshold as a slider and lets you merge two groups by
 hand, and the API takes `threshold` per request. Those two controls are more
 reliable than any default.
 
-**Quality gates.** Faces below 0.55 detector confidence or 30px are dropped. At
-0.5 the detector reported a patterned jacket as a face, which then appeared as a
-person of its own; tiny faces are worse than useless, because their descriptors
-sit close to everything and pull unrelated people together. Both gates are kept
-deliberately low so real faces survive.
+**Quality gates.** Faces below 0.5 detector confidence or 24px are dropped.
+Tiny faces are worse than useless: their descriptors sit close to everything and
+pull unrelated people together. The gates are deliberately loose — tightening
+them to 0.55 and 30px cost real faces in dark photos, and an occasional false
+positive is easier to live with than a missing person.
 
 **Detector.** `ssdMobilenetv1`. An earlier version shipped `tinyFaceDetector`
 instead, which is a tenth of the size and three times faster — and on real phone
