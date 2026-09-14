@@ -51,7 +51,8 @@ Both variables are required and the server refuses to start without them.
   Optional; any public host is allowed if unset.
 - `API_CORS_ORIGIN` — comma-separated origins allowed to call the API from a
   browser. Optional.
-- `API_MAX_DIM` — longest side images are scaled to server-side. Defaults to 640.
+- `API_MAX_DIM` — longest side images are scaled to server-side. Defaults to 1024.
+- `API_CHUNK_SIZE` — images per child process before it is replaced. Defaults to 4.
 
 ## Tests
 
@@ -122,9 +123,9 @@ curl -X POST https://your-service.onrender.com/api/group \
 
 | Route | Purpose |
 |---|---|
-| `POST /api/group` | Blocking. Up to 40 images. |
+| `POST /api/group` | Blocking. Up to 8 images. |
 | `POST /api/jobs` | Returns `202 {jobId}`. Up to 250 images. |
-| `GET /api/jobs/:id` | Job status, then the same body as `/api/group`. |
+| `GET /api/jobs/:id` | Job status; the result is nested under `result`. |
 | `POST /api/compare` | Are these two photos the same person? See the warning below. |
 | `GET /api/status` | Limits, queue depth, configured threshold, route list. |
 | `POST /` | The older `[{urls:[...]}]` shape, kept for existing callers. |
@@ -168,12 +169,45 @@ blurry — on one real album, distances between *different* people ran as low as
 hint for sorting and labelling. Anything that must actually be enforced needs
 real authentication and authorisation on the server holding the data.
 
+A finished job wraps the result rather than returning it directly:
+
+```json
+{"id": "…", "status": "done", "images": 3, "updatedAt": 1789416919203,
+ "result": {"people": [], "noFaces": [], "failed": [], "stats": {}}}
+```
+
+So read `body.result`, not `body.people`. `status` is `queued`, `running`,
+`done` or `error`.
+
+### Batch size, and why it is small
+
+Detection runs in a child process that handles four images and is then
+replaced. TensorFlow's WebAssembly heap grows as images are processed and never
+gives memory back, so a long run creeps towards the instance limit and is
+killed. On a 512MB instance, eight images at 1600px was enough to take the whole
+service down — a hard restart, which also lost whatever was queued. Replacing
+the process keeps peak memory tied to the chunk size instead of the batch size.
+
+A chunk that dies now costs only its own images: they come back in `failed` and
+the remaining chunks still run. The request succeeds with a partial result
+rather than failing outright.
+
+`API_MAX_DIM` defaults to 1024 for the same reason. Detection quality is flat
+across this range — the same faces are found at 1024 as at 1600 — so the larger
+size bought nothing but memory pressure. `API_CHUNK_SIZE` (default 4) tunes the
+rest.
+
+Downscale on your side too if you can. A Cloudinary `w_1024` derivative is less
+to download, less to decode, and measurably faster.
+
 ### Speed, and why there are two endpoints
 
 Render's free tier gives 0.1 of a CPU. Locally a photo takes roughly 100–250ms
 server-side; on the free tier expect something closer to one to three seconds
 each. Use `POST /api/group` for small batches and `POST /api/jobs` beyond
-roughly fifteen images, so the request does not sit open for a minute.
+four or five images, so the request does not sit open past a caller's own
+timeout — eight photos measured around 45 seconds on the free tier, and many
+serverless callers cap out at 60.
 
 Jobs are held in memory for 30 minutes and are lost if the service restarts,
 which on the free tier happens whenever it sleeps. Poll promptly.
