@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import compression from "compression";
 import express from "express";
 import { createApiRouter, legacyHandler } from "./lib/api.js";
 import {
@@ -45,6 +46,18 @@ if (!process.env.COOKIE_KEY) {
 
 const app = express();
 app.disable("x-powered-by");
+
+// The WebAssembly runtime is 13MB uncompressed and under 4MB gzipped, so this
+// is the difference between a tolerable first visit and an unusable one.
+app.use(compression());
+
+// Cross-origin isolation, which is what lets the runtime use more than one
+// thread. Everything this app loads is same-origin, so nothing is lost.
+app.use((_req, res, next) => {
+  res.set("Cross-Origin-Opener-Policy", "same-origin");
+  res.set("Cross-Origin-Embedder-Policy", "require-corp");
+  next();
+});
 app.set("trust proxy", 1); // Render terminates TLS in front of us.
 
 app.get("/healthz", (_req, res) => res.type("text").send("ok"));

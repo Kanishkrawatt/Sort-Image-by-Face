@@ -16,11 +16,9 @@
   },
   "license": "ISC",
   "dependencies": {
-    "@tensorflow/tfjs": "^4.22.0",
-    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
-    "@tensorflow/tfjs-core": "4.22.0",
-    "@vladmandic/face-api": "^1.7.15",
+    "compression": "^1.8.1",
     "express": "^4.21.2",
+    "onnxruntime-node": "^1.29.0",
     "sharp": "^0.35.4"
   }
 }

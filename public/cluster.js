@@ -2,19 +2,20 @@
 // can import it directly under node.
 
 /**
- * Descriptor distance below which two faces are treated as the same person.
+ * Distance below which two faces are treated as the same person.
  *
- * 0.65 sits in the middle of a wide plateau: on a real album of eight photos
- * holding four people, every value from 0.64 to 0.72 recovers exactly those
- * four. A plateau that broad is a sign the answer is right rather than lucky.
+ * Embeddings are unit length, so this runs from 0 (identical) to 2 (opposite),
+ * and it is not comparable with the value the previous model used.
  *
- * No single value suits every album. The same setting applied to a set of
- * photos full of strangers over-merges them — that set wants something nearer
- * 0.55. Personal albums of a few friends are what this is for, so the default
- * serves them, and the app exposes a slider while the API takes `threshold`
- * per request.
+ * 1.25 sits in a wide plateau: on a real album of eight photos holding four
+ * people, every value from 1.20 to 1.40 recovers exactly those four. A plateau
+ * that broad is a sign the answer is right rather than lucky.
+ *
+ * No single value suits every album. A set full of strangers wants something
+ * tighter. So the app exposes a slider and the API takes `threshold` per
+ * request.
  */
-export const MATCH_THRESHOLD = 0.65;
+export const MATCH_THRESHOLD = 1.25;
 
 export function euclidean(a, b) {
   let sum = 0;

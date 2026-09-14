@@ -252,7 +252,10 @@ timeout, and an `image/*` content type. `ALLOWED_IMAGE_HOSTS` narrows it further
 ## Notes on the design
 
 **Clustering.** Each face joins the nearest cluster whose centroid is within
-0.65 — provided that cluster holds no other face from the same photo.
+1.25 — provided that cluster holds no other face from the same photo.
+
+Embeddings are unit length, so distances run from 0 to 2 and this number is not
+comparable with the one the old model used.
 
 That last rule matters more than any tuning. Nobody appears twice in one frame,
 so two faces in a photo are two people. It is knowledge the descriptors do not
@@ -282,12 +285,11 @@ pull unrelated people together. The gates are deliberately loose — tightening
 them to 0.55 and 30px cost real faces in dark photos, and an occasional false
 positive is easier to live with than a missing person.
 
-**Detector.** `ssdMobilenetv1`. An earlier version shipped `tinyFaceDetector`
-instead, which is a tenth of the size and three times faster — and on real phone
-photos it found 1 face in a folder where this one finds 12. The demo photos have
-large frontal faces and hid the difference completely. Accuracy wins.
-
-**Backends.** WebGL, falling back to WASM and then CPU. WebGPU is not bundled
+**Backend.** WebAssembly with SIMD, multi-threaded. The server sets
+`Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy` so the page is
+cross-origin isolated, which is what permits threads; everything the app loads
+is same-origin, so nothing is lost by it. Responses are gzipped, which takes the
+runtime from 13.3MB to 3.4MB on the wire. WebGPU is not bundled
 with the face-api build in use and would require adding a bundler, which is not
 worth it until a real album shows WebGL is too slow.
 
