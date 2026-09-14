@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
+import { createApiRouter, legacyHandler } from "./lib/api.js";
 import {
   COOKIE_NAME,
   SESSION_MS,
@@ -61,6 +62,14 @@ app.post("/api/auth", express.json({ limit: "1kb" }), (req, res) => {
   });
   res.json({ ok: true });
 });
+
+// The machine-facing API. It authenticates with x-api-key rather than the
+// session cookie, so it is mounted ahead of the gate below.
+app.use("/api", createApiRouter());
+
+// The shape cloudbox already posts to. Kept so that integration needs no
+// change beyond adding its API key.
+app.post("/", express.json({ limit: "1mb" }), legacyHandler());
 
 // Everything past this point requires a valid session.
 app.use((req, res, next) => {

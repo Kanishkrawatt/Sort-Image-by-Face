@@ -199,6 +199,63 @@ environment detection assumes a DOM. Revisit only if the UI actually janks.
    WebGPU backend, and splitting static assets onto a Render static site to
    avoid the cold start.
 
+## Addendum: the machine-facing API
+
+Added after the browser app, so that cloudbox — a Next.js app whose
+`pages/api/smartgroup.ts` already posts `{ imageUrls }` and expects
+`[{urls:[...]}]` — can use this service without a browser in the loop.
+
+This deliberately reintroduces server-side inference, which the main design
+removed. The constraint that made that decision still applies, so it is
+contained rather than ignored.
+
+### What the measurements said
+
+Running face-api in Node through the WebAssembly backend, with sharp decoding
+straight to a tensor, avoids `node-canvas` and its native build entirely.
+Measured on the demo photos:
+
+| Input size | Faces found | Peak RSS |
+|---|---|---|
+| 1280px | 29 | 462MB |
+| 800px | 29 | 435MB |
+| 640px | 29 | 415MB |
+
+Face counts are identical at all three, and match the browser exactly, so 640px
+is the default: it finds the same faces for the least memory. Even so, 415MB
+against a 512MB instance leaves too little headroom to hold across requests.
+
+### Consequences
+
+**Detection runs in a forked child process that exits when the job ends**, so
+its memory returns to the operating system and the web server stays at roughly
+50MB. A cold worker costs 130–200ms locally, which is negligible next to the
+inference itself. **Only one job runs at a time**: two TensorFlow processes do
+not fit in 512MB.
+
+**Two endpoints, not one.** `POST /api/group` blocks and takes up to 40 images;
+`POST /api/jobs` returns a job id and takes up to 250. On a tenth of a CPU a
+photo costs on the order of a second, so a blocking call for a large album would
+hold a request open for minutes — which is what the existing comment in
+cloudbox's `smartgroup.ts`, "Response is coming but taking too much time",
+already describes. Jobs live in memory for 30 minutes and are lost on restart;
+on the free tier that means whenever the service sleeps.
+
+**Fetching caller-supplied URLs is the old SSRF**, so it is guarded rather than
+trusted: http and https only, public addresses only (loopback, RFC1918, carrier
+NAT, multicast and link-local — including cloud metadata at 169.254.169.254 —
+are refused), each redirect hop revalidated, the resolved address pinned for the
+connection so the name cannot change between check and use, a 15MB ceiling, a 15
+second timeout, and an `image/*` content type. `ALLOWED_IMAGE_HOSTS` narrows it
+to named hosts; for cloudbox that is `res.cloudinary.com`.
+
+**The API is disabled unless `API_KEY` is set**, so it can never be accidentally
+open. Keys are compared with a constant-time hash comparison, reusing the helper
+written for the browser login.
+
+Clustering is shared: the API imports the same `public/cluster.js` the browser
+uses, so both paths group identically and there is one implementation to test.
+
 ## Explicitly out of scope
 
 A Rust implementation. The pipeline is CNN inference, which is already compiled
