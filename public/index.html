@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sort by Face</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>Sort by Face</h1>
+      <p class="lede">
+        Pick a folder of photos and they are grouped by who appears in them.
+        Everything runs in this browser — no photo is uploaded anywhere.
+        If a person comes out split in two, tick both and merge them.
+      </p>
+
+      <div class="toolbar">
+        <button id="pick" type="button">Choose a folder</button>
+        <span id="status">Ready when you are.</span>
+      </div>
+
+      <input id="picker" type="file" webkitdirectory multiple accept="image/*" hidden />
+
+      <div id="progress" hidden><div id="bar"></div></div>
+
+      <div class="tuning" id="tuning" hidden>
+        <label for="threshold">Grouping</label>
+        <input id="threshold" type="range" min="0.35" max="0.75" step="0.01" value="0.65" />
+        <span id="thresholdValue" class="mono">0.65</span>
+        <span class="hint">left splits people apart, right merges them together</span>
+        <button id="merge" type="button" disabled>Merge selected</button>
+        <button id="reset" type="button" class="ghost" disabled>Undo merges</button>
+      </div>
+      <p id="summary"></p>
+      <div id="results"></div>
+    </main>
+
+    <script src="/vendor/jszip.min.js"></script>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
