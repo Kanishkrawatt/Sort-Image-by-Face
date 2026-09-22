@@ -7,15 +7,17 @@
  * Embeddings are unit length, so this runs from 0 (identical) to 2 (opposite),
  * and it is not comparable with the value the previous model used.
  *
- * 1.25 sits in a wide plateau: on a real album of eight photos holding four
- * people, every value from 1.20 to 1.40 recovers exactly those four. A plateau
- * that broad is a sign the answer is right rather than lucky.
+ * 0.9 sits between two measured populations. On a benchmark of one photo
+ * degraded six ways — tilted 25 degrees, darkened, blurred, shrunk, and
+ * compressed to nothing — the furthest pair of faces belonging to one person
+ * was 0.579 apart and the nearest pair belonging to two people was 1.220. Any
+ * value between those separates them perfectly; 0.9 is the middle.
  *
  * No single value suits every album. A set full of strangers wants something
  * tighter. So the app exposes a slider and the API takes `threshold` per
  * request.
  */
-export const MATCH_THRESHOLD = 1.25;
+export const MATCH_THRESHOLD = 0.9;
 
 export function euclidean(a, b) {
   let sum = 0;

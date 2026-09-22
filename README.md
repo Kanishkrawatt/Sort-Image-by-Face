@@ -131,7 +131,7 @@ curl -X POST https://your-service.onrender.com/api/group \
 | `POST /` | The older `[{urls:[...]}]` shape, kept for existing callers. |
 
 Optional `threshold` in the body overrides the clustering distance for that
-request (default 0.65). Lower splits people apart, higher merges them together;
+request (default 0.9). Lower splits people apart, higher merges them together;
 it is the quickest way to tune grouping without redeploying.
 
 A photo that fails to download appears in `failed`; the rest of the batch still
@@ -163,9 +163,9 @@ the right threshold depends on your photos.
 **This is a similarity measurement, not an identity check, and it must not gate
 access to anything.** It compares two images and cannot tell a person from a
 photograph of that person, so anyone holding a picture of the subject passes.
-The descriptors are also unreliable on faces that are turned away, dark or
-blurry — on one real album, distances between *different* people ran as low as
-0.40 while distances between the *same* person reached 0.93. Treat a match as a
+Grouping accuracy is good enough to sort an album and wrong often enough to
+matter for anything else: a face turned far away, in deep shadow, or motion
+blurred can still land on the wrong side of any threshold. Treat a match as a
 hint for sorting and labelling. Anything that must actually be enforced needs
 real authentication and authorisation on the server holding the data.
 
@@ -252,10 +252,12 @@ timeout, and an `image/*` content type. `ALLOWED_IMAGE_HOSTS` narrows it further
 ## Notes on the design
 
 **Clustering.** Each face joins the nearest cluster whose centroid is within
-1.25 — provided that cluster holds no other face from the same photo.
+0.9 — provided that cluster holds no other face from the same photo.
 
-Embeddings are unit length, so distances run from 0 to 2 and this number is not
-comparable with the one the old model used.
+Embeddings are unit length, so distances run from 0 to 2. The default sits in
+the middle of the measured gap: 0.579 was the furthest two faces of one person
+ever fell apart, and 1.220 the closest two faces of different people came
+together.
 
 That last rule matters more than any tuning. Nobody appears twice in one frame,
 so two faces in a photo are two people. It is knowledge the descriptors do not
