@@ -324,6 +324,40 @@ that album.
 Names are stored against a face's stable identity rather than a group number, so
 renaming survives both re-grouping and merging.
 
+## Addendum: the detector was the accuracy ceiling
+
+Grouping was still unreliable after the move to ONNX, so the question was put
+properly: build a benchmark, measure, and only then change something.
+
+**The benchmark.** One photo of three people, degraded six ways — tilted 25
+degrees, darkened, blurred, shrunk to a quarter, compressed to nothing, and
+tilted and darkened together. Identity within each photo is its left-to-right
+rank, which survives all of those, giving 189 pairs to judge as same or
+different. The degradations were chosen to match what the real album actually
+contained.
+
+**What it showed.** The small detector reached 96.8% with a margin of −0.079:
+the furthest pair of faces belonging to one person was 1.272 apart while the
+nearest pair belonging to two people was 1.194. A negative margin means the two
+populations overlap, so no threshold separates them and some errors are
+unavoidable. That, not the threshold, was what made grouping feel arbitrary.
+
+**What fixed it.** The large detector, alone, takes the margin to +0.598 and the
+accuracy to 100%. Mirror averaging — describing each face twice, once flipped,
+and averaging — widens it to 0.641 for one extra pass and no memory.
+
+**What did not.** The large recogniser was the obvious suspect and was nearly
+the wrong answer. It adds only 0.061 of margin over the large detector alone,
+and costs 280MB: measured in its own process it reaches 455MB, which leaves a
+512MB instance under 60MB of headroom. Detection quality governs the keypoints,
+the keypoints govern the alignment, and the alignment governs everything
+downstream. Describing a badly aligned face better does not help.
+
+The shipped pairing is therefore the large detector with the small recogniser:
+100% on that benchmark, a margin of 0.641, 319MB peak and about 360ms a photo.
+The default threshold moves to 0.9, the middle of the measured gap between 0.579
+and 1.220.
+
 ## Explicitly out of scope
 
 A Rust implementation. The pipeline is CNN inference, which is already compiled

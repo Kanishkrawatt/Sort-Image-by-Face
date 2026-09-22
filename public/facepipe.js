@@ -195,6 +195,34 @@ export function warpFace(pixels, width, height, channels, transform, preview) {
   return out;
 }
 
+/**
+ * Mirror an aligned crop.
+ *
+ * A face and its mirror describe the same person, so averaging the two
+ * descriptions cancels some of the noise that pose and lighting introduce. It
+ * costs a second pass over the recogniser and nothing in memory.
+ */
+export function mirrorFace(tensor) {
+  const mirrored = new Float32Array(tensor.length);
+  const plane = FACE_SIZE * FACE_SIZE;
+  for (let c = 0; c < 3; c++) {
+    for (let v = 0; v < FACE_SIZE; v++) {
+      for (let u = 0; u < FACE_SIZE; u++) {
+        mirrored[c * plane + v * FACE_SIZE + u] =
+          tensor[c * plane + v * FACE_SIZE + (FACE_SIZE - 1 - u)];
+      }
+    }
+  }
+  return mirrored;
+}
+
+/** Element-wise sum, for averaging a face with its mirror before normalising. */
+export function addVectors(a, b) {
+  const out = new Float32Array(a.length);
+  for (let i = 0; i < a.length; i++) out[i] = a[i] + b[i];
+  return out;
+}
+
 /** Scale an embedding to unit length, so distances between them are comparable. */
 export function normalise(values) {
   let sum = 0;

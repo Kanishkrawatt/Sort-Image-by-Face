@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   DETECT_SIZE, FACE_SIZE, TEMPLATE,
-  decodeDetections, letterbox, normalise, similarityTransform,
-  suppressOverlaps, toTensor, warpFace,
+  addVectors, decodeDetections, letterbox, mirrorFace, normalise,
+  similarityTransform, suppressOverlaps, toTensor, warpFace,
 } from "./public/facepipe.js";
 
 const close = (a, b, tolerance = 1e-6) =>
@@ -181,4 +181,39 @@ test("normalise gives unit length, and survives an all-zero vector", () => {
 
   const zero = normalise([0, 0, 0]);
   assert.ok(zero.every((v) => v === 0), "must not divide by zero");
+});
+
+test("mirrorFace flips left to right, and twice returns the original", () => {
+  const plane = FACE_SIZE * FACE_SIZE;
+  const tensor = new Float32Array(3 * plane);
+  // Mark one pixel near the left edge of the red plane.
+  tensor[5 * FACE_SIZE + 2] = 1;
+
+  const mirrored = mirrorFace(tensor);
+  assert.equal(mirrored[5 * FACE_SIZE + 2], 0, "the mark should have moved");
+  assert.equal(mirrored[5 * FACE_SIZE + (FACE_SIZE - 3)], 1, "to the far side");
+
+  const twice = mirrorFace(mirrored);
+  assert.deepEqual(Array.from(twice), Array.from(tensor));
+});
+
+test("mirrorFace keeps each colour plane separate", () => {
+  const plane = FACE_SIZE * FACE_SIZE;
+  const tensor = new Float32Array(3 * plane);
+  tensor[2 * plane + 7 * FACE_SIZE + 1] = 0.5; // blue plane only
+
+  const mirrored = mirrorFace(tensor);
+  assert.equal(mirrored[2 * plane + 7 * FACE_SIZE + (FACE_SIZE - 2)], 0.5);
+  assert.equal(mirrored[7 * FACE_SIZE + (FACE_SIZE - 2)], 0, "red plane untouched");
+});
+
+test("addVectors sums element-wise", () => {
+  assert.deepEqual(Array.from(addVectors([1, 2, 3], [10, 20, 30])), [11, 22, 33]);
+});
+
+test("a face and its mirror average to a unit vector", () => {
+  const a = [3, 0, 4];
+  const b = [0, 5, 0];
+  const averaged = normalise(addVectors(a, b));
+  close(Math.hypot(...averaged), 1, 1e-9);
 });

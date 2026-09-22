@@ -3,8 +3,8 @@
 
 import {
   DETECT_SIZE, FACE_SIZE, TEMPLATE,
-  decodeDetections, letterbox, normalise, similarityTransform,
-  suppressOverlaps, toTensor, warpFace,
+  addVectors, decodeDetections, letterbox, mirrorFace, normalise,
+  similarityTransform, suppressOverlaps, toTensor, warpFace,
 } from "./facepipe.js";
 
 const MODEL_URL = "/models";
@@ -177,12 +177,19 @@ export async function detectFaces(file) {
         preview,
       );
 
-      const output = await recogniser.run({
-        "input.1": new ort.Tensor("float32", aligned, [1, 3, FACE_SIZE, FACE_SIZE]),
-      });
+      const describe = async (tensor) => {
+        const output = await recogniser.run({
+          "input.1": new ort.Tensor("float32", tensor, [1, 3, FACE_SIZE, FACE_SIZE]),
+        });
+        return output[recogniser.outputNames[0]].data;
+      };
+
+      // Averaging a face with its mirror cancels some of the noise that pose
+      // and lighting introduce, for one extra pass and no extra memory.
+      const combined = addVectors(await describe(aligned), await describe(mirrorFace(aligned)));
 
       faces.push({
-        descriptor: normalise(output[recogniser.outputNames[0]].data),
+        descriptor: normalise(combined),
         thumbnail: thumbnailFrom(preview),
         score: box.score,
       });
